@@ -1,6 +1,7 @@
 """CLI entry point for reel-separator."""
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -165,10 +166,10 @@ def separate(
         "--save-transcript",
         help="Save transcription as JSON file",
     ),
-    use_api: bool = typer.Option(
-        False,
+    api_key: str = typer.Option(
+        None,
         "--api",
-        help="Use OpenAI API instead of local Whisper (requires OPENAI_API_KEY)",
+        help="Use OpenAI API with this key (or set OPENAI_API_KEY env var)",
     ),
 ) -> None:
     """Split raw video(s) into individual reels.
@@ -183,6 +184,11 @@ def separate(
 
         reel-separator bruto1.mp4 bruto2.mp4 bruto3.mp4 -s script.md
     """
+    # Resolve API usage
+    use_api = api_key is not None or os.environ.get("OPENAI_API_KEY") is not None
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
+
     # Resolve base output directory
     if output_dir is None:
         output_dir = videos[0].parent / "reels"
