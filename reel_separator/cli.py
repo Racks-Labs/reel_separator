@@ -36,6 +36,7 @@ def _process_single_video(
     precise: bool,
     dry_run: bool,
     save_transcript: bool,
+    use_api: bool = False,
 ) -> list[Path]:
     """Process a single video through the full pipeline.
 
@@ -50,6 +51,7 @@ def _process_single_video(
         language=language,
         initial_prompt=titles_prompt,
         device=device,
+        use_api=use_api,
     )
 
     if save_transcript:
@@ -163,6 +165,11 @@ def separate(
         "--save-transcript",
         help="Save transcription as JSON file",
     ),
+    use_api: bool = typer.Option(
+        False,
+        "--api",
+        help="Use OpenAI API instead of local Whisper (requires OPENAI_API_KEY)",
+    ),
 ) -> None:
     """Split raw video(s) into individual reels.
 
@@ -231,6 +238,7 @@ def separate(
             precise=precise,
             dry_run=dry_run,
             save_transcript=save_transcript,
+            use_api=use_api,
         )
 
         all_output_paths.extend(paths)
