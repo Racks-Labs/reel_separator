@@ -1,0 +1,37 @@
+[project]
+name = "reel-separator"
+version = "0.1.0"
+description = "Split a raw video into individual reels based on a markdown script file using Whisper speech-to-text"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Racks Labs", email = "hello@rackslabs.com" }]
+license = { text = "MIT" }
+keywords = ["video", "reels", "whisper", "ffmpeg", "transcription", "splitter"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+    "openai-whisper>=20240930",
+    "rapidfuzz>=3.0",
+    "typer>=0.12",
+    "rich>=13.0",
+    "pydantic>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Racks-Labs/reel_separator"
+Repository = "https://github.com/Racks-Labs/reel_separator"
+Issues = "https://github.com/Racks-Labs/reel_separator/issues"
+
+[project.scripts]
+reel-separator = "reel_separator.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reel_separator"]

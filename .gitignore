@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Video files and transcripts
+*.mp4
+*.mov
+*.avi
+*.mkv
+*_transcript.json
+
+# Output
+reels/
