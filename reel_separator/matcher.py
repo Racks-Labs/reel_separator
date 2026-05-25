@@ -33,6 +33,49 @@ def _score_match(title_normalized: str, window_normalized: str) -> float:
     return 0.6 * r + 0.4 * tsr
 
 
+def _find_best_match(
+    title_normalized: str,
+    title_word_count: int,
+    all_words: list[TranscribedWord],
+    start_idx: int,
+    end_idx: int | None = None,
+    excluded_ranges: list[tuple[int, int]] | None = None,
+) -> tuple[float, int, int]:
+    """Find best matching window for a title in a word range.
+
+    Returns (best_score, best_start_idx, best_end_idx).
+    """
+    if end_idx is None:
+        end_idx = len(all_words)
+    if excluded_ranges is None:
+        excluded_ranges = []
+
+    best_score = 0.0
+    best_start_idx = -1
+    best_end_idx = -1
+
+    min_window = max(2, title_word_count - 1)
+    max_window = title_word_count + 3
+
+    for ws in range(min_window, max_window + 1):
+        for i in range(start_idx, min(end_idx, len(all_words) - ws + 1)):
+            # Skip excluded ranges
+            if any(ex_start <= i <= ex_end for ex_start, ex_end in excluded_ranges):
+                continue
+
+            window_text = " ".join(w.word for w in all_words[i : i + ws])
+            window_normalized = normalize_text(window_text)
+
+            score = _score_match(title_normalized, window_normalized)
+
+            if score > best_score:
+                best_score = score
+                best_start_idx = i
+                best_end_idx = i + ws - 1
+
+    return best_score, best_start_idx, best_end_idx
+
+
 def find_title_matches(
     reels: list[ReelScript],
     transcription: TranscriptionResult,
@@ -40,9 +83,12 @@ def find_title_matches(
 ) -> list[TitleMatch]:
     """Find where each reel title is spoken in the transcription.
 
-    Uses sequential sliding window fuzzy matching: processes titles in
-    markdown order and restricts each search to AFTER the previous match.
-    This prevents duplicate position matches and ensures correct ordering.
+    Two-pass approach:
+      Pass 1: Sequential matching (titles in markdown order, each search
+              starts after previous match). Handles the common case.
+      Pass 2: For titles missed in pass 1, search the entire transcription
+              excluding already-matched positions. Handles out-of-order or
+              garbled transcriptions.
 
     Args:
         reels: Parsed reel scripts with titles.
@@ -58,31 +104,19 @@ def find_title_matches(
         return []
 
     matches: list[TitleMatch] = []
-    search_start_idx = 0  # Restrict search to after previous match
+    matched_indices: set[int] = set()  # reel indices already matched
+    matched_ranges: list[tuple[int, int]] = []  # word ranges already used
+
+    # --- Pass 1: Sequential matching ---
+    search_start_idx = 0
 
     for reel in reels:
         title_normalized = normalize_text(reel.title)
         title_word_count = len(title_normalized.split())
 
-        best_score = 0.0
-        best_start_idx = -1
-        best_end_idx = -1
-
-        # Try window sizes around title word count
-        min_window = max(2, title_word_count - 1)
-        max_window = title_word_count + 3
-
-        for ws in range(min_window, max_window + 1):
-            for i in range(search_start_idx, len(all_words) - ws + 1):
-                window_text = " ".join(w.word for w in all_words[i : i + ws])
-                window_normalized = normalize_text(window_text)
-
-                score = _score_match(title_normalized, window_normalized)
-
-                if score > best_score:
-                    best_score = score
-                    best_start_idx = i
-                    best_end_idx = i + ws - 1
+        best_score, best_start_idx, best_end_idx = _find_best_match(
+            title_normalized, title_word_count, all_words, search_start_idx
+        )
 
         if best_score >= threshold and best_start_idx >= 0:
             matched_text = " ".join(
@@ -98,13 +132,57 @@ def find_title_matches(
                     end_time=all_words[best_end_idx].end,
                 )
             )
-            # Move search window past this match for next title
+            matched_indices.add(reel.index)
+            matched_ranges.append((best_start_idx, best_end_idx))
+            # Move search window past this match
             search_start_idx = best_end_idx + 1
-        else:
-            console.print(
-                f"[yellow]Warning:[/yellow] Title not found: "
-                f"'{reel.title}' (best score: {best_score:.0f})"
+
+    # --- Pass 2: Retry missed titles (non-sequential) ---
+    missed_reels = [r for r in reels if r.index not in matched_indices]
+
+    if missed_reels:
+        console.print(
+            f"[dim]Pass 2: retrying {len(missed_reels)} missed title(s) "
+            f"without sequential constraint...[/dim]"
+        )
+
+        for reel in missed_reels:
+            title_normalized = normalize_text(reel.title)
+            title_word_count = len(title_normalized.split())
+
+            # Search entire transcription, excluding already-matched ranges
+            best_score, best_start_idx, best_end_idx = _find_best_match(
+                title_normalized,
+                title_word_count,
+                all_words,
+                start_idx=0,
+                end_idx=None,
+                excluded_ranges=matched_ranges,
             )
+
+            if best_score >= threshold and best_start_idx >= 0:
+                matched_text = " ".join(
+                    w.word for w in all_words[best_start_idx : best_end_idx + 1]
+                )
+                matches.append(
+                    TitleMatch(
+                        reel_index=reel.index,
+                        title=reel.title,
+                        matched_text=matched_text,
+                        score=round(best_score, 1),
+                        start_time=all_words[best_start_idx].start,
+                        end_time=all_words[best_end_idx].end,
+                    )
+                )
+                matched_ranges.append((best_start_idx, best_end_idx))
+            else:
+                console.print(
+                    f"[yellow]Warning:[/yellow] Title not found: "
+                    f"'{reel.title}' (best score: {best_score:.0f})"
+                )
+
+    # Sort all matches by start_time
+    matches.sort(key=lambda m: m.start_time)
 
     return matches
 
