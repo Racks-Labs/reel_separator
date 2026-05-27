@@ -34,7 +34,7 @@ def _process_single_video(
     device: Optional[str],
     threshold: float,
     min_silence: float,
-    precise: bool,
+    fast: bool,
     dry_run: bool,
     save_transcript: bool,
     use_api: bool = False,
@@ -97,7 +97,7 @@ def _process_single_video(
         return []
 
     console.print(Panel(f"[bold]Cutting reels:[/bold] {video.name}"))
-    return execute_cuts(cuts, video, output_dir, precise)
+    return execute_cuts(cuts, video, output_dir, fast)
 
 
 @app.command()
@@ -151,10 +151,10 @@ def separate(
         "--min-silence",
         help="Minimum silence gap in seconds for cut detection",
     ),
-    precise: bool = typer.Option(
+    fast: bool = typer.Option(
         False,
-        "--precise",
-        help="Frame-accurate cuts (re-encodes, slower)",
+        "--fast",
+        help="Stream copy instead of re-encoding (faster but may glitch at cut points)",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -241,7 +241,7 @@ def separate(
             device=device,
             threshold=threshold,
             min_silence=min_silence,
-            precise=precise,
+            fast=fast,
             dry_run=dry_run,
             save_transcript=save_transcript,
             use_api=use_api,

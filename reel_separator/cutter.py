@@ -82,7 +82,7 @@ def execute_cuts(
     cuts: list[ReelCut],
     video_path: Path,
     output_dir: Path,
-    precise: bool = False,
+    fast: bool = False,
 ) -> list[Path]:
     """Execute all cuts and produce individual reel files.
 
@@ -90,7 +90,7 @@ def execute_cuts(
         cuts: Cut plan.
         video_path: Source video.
         output_dir: Output directory.
-        precise: Re-encode for frame-accurate cuts.
+        fast: Use stream copy instead of re-encoding (faster but may glitch).
 
     Returns:
         List of output file paths.
@@ -113,7 +113,7 @@ def execute_cuts(
             progress.update(task, description=f"Cutting: {cut.title[:40]}")
 
             try:
-                cut_reel(video_path, output_path, cut.start, cut.end, precise)
+                cut_reel(video_path, output_path, cut.start, cut.end, fast)
                 output_paths.append(output_path)
             except Exception as e:
                 failed.append(f"{cut.title}: {e}")

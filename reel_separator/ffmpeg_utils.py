@@ -35,24 +35,44 @@ def cut_reel(
     output_path: Path,
     start: float,
     end: float,
-    precise: bool = False,
+    fast: bool = False,
 ) -> Path:
     """Cut a segment from the video.
+
+    Default: re-encode for clean, glitch-free output.
+    Fast mode: stream copy (keyframe-bound, may glitch at cut points).
 
     Args:
         video_path: Source video.
         output_path: Output file path.
         start: Start time in seconds.
         end: End time in seconds.
-        precise: If True, re-encode for frame-accurate cuts (slower).
+        fast: If True, use stream copy (faster but may produce glitchy frames).
 
     Returns:
         Path to output file.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if precise:
-        # Re-encode for frame-accurate cuts
+    if fast:
+        # Stream copy — fast but cuts on keyframes (may glitch)
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(start),
+            "-to",
+            str(end),
+            "-i",
+            str(video_path),
+            "-c",
+            "copy",
+            "-avoid_negative_ts",
+            "make_zero",
+            str(output_path),
+        ]
+    else:
+        # Re-encode — frame-accurate, clean output (default)
         cmd = [
             "ffmpeg",
             "-y",
@@ -72,23 +92,6 @@ def cut_reel(
             "aac",
             "-b:a",
             "192k",
-            str(output_path),
-        ]
-    else:
-        # Stream copy — fast but cuts on keyframes
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-ss",
-            str(start),
-            "-to",
-            str(end),
-            "-i",
-            str(video_path),
-            "-c",
-            "copy",
-            "-avoid_negative_ts",
-            "make_zero",
             str(output_path),
         ]
 
